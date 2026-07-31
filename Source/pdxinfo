@@ -1,0 +1,6 @@
+name=Todo List
+author=gebeto
+description=A simple todo list
+bundleID=com.gebeto.todolist
+version=1.0
+buildNumber=1
