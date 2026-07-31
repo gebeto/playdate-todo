@@ -1,5 +1,7 @@
 import "CoreLibs/graphics"
 import "CoreLibs/keyboard"
+import "config"
+import "todoist"
 
 local gfx <const> = playdate.graphics
 
@@ -18,6 +20,7 @@ local SAVE_KEY <const> = "todos"
 local todos = { active = {}, completed = {} }
 local currentTab = "active" -- "active" | "completed"
 local selection = 1
+local initialFetchStarted = false -- guards the one-time boot fetch from Todoist
 
 --------------------------------------------------------------------------------
 -- Persistence
@@ -65,8 +68,16 @@ end
 local function addTodo(title)
     title = trim(title or "")
     if #title == 0 then return end
-    table.insert(todos.active, { title = title })
+    -- Optimistic local insert; the Todoist id is filled in when the API responds.
+    local item = { title = title }
+    table.insert(todos.active, item)
     saveTodos()
+    todoist.createTask(title, function(ok, data)
+        if ok and data and data.id then
+            item.id = data.id
+            saveTodos()
+        end
+    end)
 end
 
 local function completeSelected()
@@ -77,6 +88,7 @@ local function completeSelected()
     table.insert(todos.completed, item)
     clampSelection()
     saveTodos()
+    if item.id then todoist.closeTask(item.id) end
 end
 
 local function uncompleteSelected()
@@ -87,6 +99,7 @@ local function uncompleteSelected()
     table.insert(todos.active, item)
     clampSelection()
     saveTodos()
+    if item.id then todoist.reopenTask(item.id) end
 end
 
 local function toggleSelected()
@@ -95,6 +108,34 @@ local function toggleSelected()
     else
         uncompleteSelected()
     end
+end
+
+-- Replace the active list with tasks fetched from Todoist, preserving any
+-- locally-added items that haven't been pushed yet (no id). Completed stays local.
+local function mergeServerTasks(results)
+    local newActive = {}
+    for _, t in ipairs(results) do
+        newActive[#newActive + 1] = { id = t.id, title = t.content or "" }
+    end
+    for _, item in ipairs(todos.active) do
+        if not item.id then
+            newActive[#newActive + 1] = item
+        end
+    end
+    todos.active = newActive
+    clampSelection()
+    saveTodos()
+end
+
+-- One-time fetch of active tasks from Todoist on boot.
+local function startInitialFetch()
+    if initialFetchStarted then return end
+    initialFetchStarted = true
+    todoist.fetchTasks(function(ok, data)
+        if ok and data and data.results then
+            mergeServerTasks(data.results)
+        end
+    end)
 end
 
 local function switchTab(tab)
@@ -222,6 +263,12 @@ local function drawList()
 end
 
 function playdate.update()
+    -- Networking must be driven from here (not input handlers): new()/requestAccess()
+    -- yield a coroutine for the permission dialog.
+    todoist.requestAccessOnce()
+    startInitialFetch()
+    todoist.update()
+
     gfx.clear()
     drawHeader()
     drawList()

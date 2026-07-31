@@ -1,0 +1,9 @@
+-- Copy this file to config.lua and fill in your token.
+-- config.lua is gitignored so your token is never committed.
+--
+-- Get a personal API token from Todoist:
+--   Settings -> Integrations -> Developer -> "Copy API token"
+--
+-- This sets a global that Source/todoist.lua reads.
+
+TODOIST_TOKEN = "your_personal_api_token_here"
