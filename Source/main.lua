@@ -5,6 +5,14 @@ import "todoist"
 
 local gfx <const> = playdate.graphics
 
+-- Fonts. The system font has no Cyrillic glyphs, so we ship a Cyrillic-capable
+-- bitmap font (see tools/genfont.py) and set it as the global default. The footer
+-- draws Playdate button glyphs (⬅➡⬆⬇Ⓐ) that live only in the system font, so it
+-- switches back to systemFont for that one draw.
+local systemFont = gfx.getSystemFont()
+-- local cyrFont = gfx.font.new("fonts/NotoCyrillic")
+local cyrFont = gfx.font.new("fonts/Ithaca")
+
 -- Layout constants
 local SCREEN_W <const> = 400
 local SCREEN_H <const> = 240
@@ -228,8 +236,11 @@ local function drawFooter()
     local y = SCREEN_H - FOOTER_H
     gfx.drawLine(0, y, SCREEN_W, y)
     local action = (currentTab == "active") and "Ⓐ done" or "Ⓐ undo"
+    -- Button glyphs (⬅➡⬆⬇Ⓐ) exist only in the system font.
+    gfx.setFont(systemFont)
     gfx.drawTextInRect("⬅➡ tabs  ⬆⬇ move  " .. action .. "  Menu: add",
         0, y + 3, SCREEN_W, FOOTER_H, nil, nil, kTextAlignment.center)
+    if cyrFont then gfx.setFont(cyrFont) end
 end
 
 local function drawList()
@@ -280,7 +291,11 @@ end
 --------------------------------------------------------------------------------
 
 local function init()
+    if cyrFont then gfx.setFont(cyrFont) end
     loadTodos()
+    -- TEMP verify seed
+    -- todos.active = { {title="Купити хліб"}, {title="Привет мир"}, {title="Mixed Латиниця 123"}, {title="Зробити щось важливе"} }
+    -- todos.completed = { {title="Готово завдання"} }
     clampSelection()
     setupMenu()
 end
